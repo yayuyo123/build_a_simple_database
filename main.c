@@ -21,6 +21,69 @@ InputBuffer* new_input_buffer() {
     return input_buffer;
 }
 
+/**
+ * メタコマンドはプログラム自体を制御するコマンドでここではドット(.)で始まる
+ */
+typedef enum {
+    META_COMMAND_SUCCESS,
+    META_COMMAND_UNRECOGNIZED_COMMAND
+} MetaCommandResult;
+
+MetaCommandResult do_meta_command(InputBuffer* input_buffer) {
+    if(strcmp(input_buffer->buffer, ".exit") == 0) {
+        exit(EXIT_SUCCESS);
+    } else {
+        return META_COMMAND_UNRECOGNIZED_COMMAND;
+    }
+}
+
+typedef enum {
+    STATEMENT_INSERT,
+    STATEMENT_SELECT
+} StatementType;
+
+// ステートメント解析の結果を表す列挙型
+typedef enum {
+    PREPARE_SUCCESS,                // ステートメント解析が成功
+    PREPARE_UNRECOGNIZED_STATEMENT  // 認識できないステートメント
+} PrepareResult;
+
+typedef struct {
+  StatementType type;
+} Statement;
+
+/**
+ * 入力された文字列を解析し、対応するステートメントを設定する関数
+ * 
+ * @param input_buffer ユーザー入力が格納されたバッファ
+ * @param statement    解析結果を格納するステートメント構造体
+ * @return PrepareResult ステートメント解析の結果
+ */
+PrepareResult prepare_statement(InputBuffer* input_buffer, Statement* statement) {
+    if(strncmp(input_buffer->buffer, "insert", 6) == 0) {
+        statement->type = STATEMENT_INSERT; // ステートメントタイプを INSERT に設定
+        return PREPARE_SUCCESS; // 解析成功を返す
+    }
+    if(strcmp(input_buffer->buffer, "select") == 0) {
+        statement->type = STATEMENT_SELECT; // ステートメントタイプを SELECT に設定
+        return PREPARE_SUCCESS; // 解析成功を返す
+    }
+
+    // 上記以外の場合、認識できないステートメントとしてエラーを返す
+    return PREPARE_UNRECOGNIZED_STATEMENT;
+}
+
+void execute_statement(Statement* statement) {
+    switch (statement->type) {
+        case (STATEMENT_INSERT):
+            printf("This is where we would do an insert.\n");
+            break;
+        case (STATEMENT_SELECT):
+            printf("This is where we would do a select.\n");
+            break;
+    }
+}
+
 void print_prompt() {
     printf("db > ");
 }
@@ -58,11 +121,31 @@ int main(int argc, char* argv[]) {
         print_prompt();
         read_input(input_buffer);
 
-        if(strcmp(input_buffer->buffer, ".exit") == 0) {
-            close_input_buffer(input_buffer);
-            exit(EXIT_SUCCESS);
-        } else {
-            printf("Unrecognized command '%s'.\n", input_buffer->buffer);
+        // メタコマンド(ドットで始まるプログラムを制御するコマンド)
+        if(input_buffer->buffer[0] == '.') {
+            switch (do_meta_command(input_buffer)) {
+                case (META_COMMAND_SUCCESS):
+                    continue;
+                case (META_COMMAND_UNRECOGNIZED_COMMAND):
+                    printf("Unrecognized command '%s'\n", input_buffer->buffer);
+                    continue;
+            }
         }
+
+        // ステートメントの解析結果を保持
+        Statement statement;
+        // 入力を解析し、結果に応じて処理を分岐
+        switch (prepare_statement(input_buffer, &statement)) {
+            case (PREPARE_SUCCESS):
+                break;
+            case (PREPARE_UNRECOGNIZED_STATEMENT):
+                printf("Unrecognized keyword at start of'%s'.\n", input_buffer->buffer);
+                continue;
+        }
+
+        // ステートメントを実行
+        execute_statement(&statement);
+        printf("Executed.\n");
+
     }
 }
